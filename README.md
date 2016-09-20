@@ -1,4 +1,4 @@
-# Datastore Testibility (dsunit-java)
+# Datastore Testibility (jdsunit)
 
 **Datastore testibility library for java.**
 
