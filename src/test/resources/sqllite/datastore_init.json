@@ -1,0 +1,26 @@
+{
+  "DatastoreConfigs": [
+    {
+      "Datastore": "testdb",
+      "AdminDbName": "testdb",
+      "ClearDatastore": false,
+      "Config": {
+        "DriverName": "sqlite3",
+        "Descriptor": "[url]",
+        "Parameters": {
+          "url": "test://resources/sqllite/testdb.db"
+        }
+      },
+      "Descriptors": [
+        {
+          "Table": "users",
+          "Autoincrement": true,
+          "PkColumns": [
+            "id"
+          ]
+        }
+      ]
+    }
+  ]
+}
+

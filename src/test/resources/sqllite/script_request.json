@@ -1,0 +1,14 @@
+{
+  "Scripts": [
+    {
+      "Datastore": "testdb",
+      "Url": "test://resources/sqllite/database.sql"
+    },
+    {
+      "Datastore": "testdb",
+      "Sqls": [
+        "INSERT INTO users(username, active, salary, comments, last_access_time) VALUES('Edi', 1, 43000, 'no comments', CURRENT_TIMESTAMP);"
+      ]
+    }
+  ]
+}
