@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.viant.dsunit</groupId>
-    <artifactId>dsunit-java</artifactId>
+    <artifactId>jdsunit</artifactId>
     <version>1.0-SNAPSHOT</version>
 
 
