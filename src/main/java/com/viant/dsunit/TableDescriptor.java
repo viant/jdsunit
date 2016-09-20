@@ -49,6 +49,9 @@ public class TableDescriptor {
     @JsonProperty("SchemaUrl")
     private String schemaUrl;//url with JSON to the TableDescriptor.Schema.
 
+    @JsonProperty("FromQuery")
+    private String fromQuery;//for query based table
+
     public String getTable() {
         return table;
     }
@@ -95,5 +98,13 @@ public class TableDescriptor {
 
     public void setSchemaUrl(String schemaUrl) {
         this.schemaUrl = schemaUrl;
+    }
+
+    public String getFromQuery() {
+        return fromQuery;
+    }
+
+    public void setFromQuery(String fromQuery) {
+        this.fromQuery = fromQuery;
     }
 }
