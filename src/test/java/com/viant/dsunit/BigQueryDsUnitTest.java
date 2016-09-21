@@ -74,7 +74,6 @@ public class BigQueryDsUnitTest {
             //Business logic would come here
             //
 
-            //active:true, comments:"xyz", id:4, last_access_time:"2016-03-01 08:43:00", salary:12800, username:"Vudi"
 
             {
                 //verify that datastore(BigQuery) has snapshot of data defined in json files in src/test/resources starting with test1_expect_<table>
@@ -88,6 +87,14 @@ public class BigQueryDsUnitTest {
                 //test2 data has different data than datastore should there should be an error
                 ExpectResponse expectResponse = service.expectDatasets("MyDataset", new File("src/test/resources/bg").getAbsolutePath(), "test2", DsUnitService.SNAPSHOT_DATASET_CHECK_POLICY);
                 Assert.assertEquals("should have error status " + expectResponse, "error", expectResponse.getStatus());
+            }
+
+
+            {
+
+                //verify  that test3_expect_traveler1_count.json is equal to "SELECT  /* USE LEGACY SQL */ id, COUNT( mostLikedCity.visits ) WITHIN RECORD AS visits FROM travelers1"
+                ExpectResponse expectResponse = service.expectDatasets("MyDataset", new File("src/test/resources/bg").getAbsolutePath(), "test3", DsUnitService.FULL_TABLE_DATASET_CHECK_POLICY);
+                Assert.assertEquals("should have ok status " + expectResponse, "ok", expectResponse.getStatus());
             }
         } finally {
             service.close();

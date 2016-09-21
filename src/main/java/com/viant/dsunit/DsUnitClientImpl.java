@@ -205,28 +205,30 @@ public class DsUnitClientImpl implements DsUnitService {
         result.setDatasets(new ArrayList<Dataset>());
         for(File candidate: candidates) {
             if(candidate.getName().endsWith(".json")) {
-                List<Object> fileRows = getFileData(candidate);
 
+                List<Object> fileRows = getFileData(candidate);
+                TableDescriptor descriptor = getTableDescriptor(prefix, candidate);
+                Dataset dataset = new Dataset();
+                dataset.setTable(descriptor.getTable());
+                dataset.setFromQuery(descriptor.getFromQuery());
+                dataset.setAutoincrement(descriptor.getAutoincrement());
+                dataset.setPkColumns(descriptor.getPkColumns());
+                dataset.setSchema(descriptor.getSchema());
+                dataset.setSchemaUrl(descriptor.getSchemaUrl());
+                result.getDatasets().add(dataset);
+                List<Row> datasetRows = new ArrayList<Row>();
+                Set<String> allColumns = new HashSet<String>();
+                dataset.setRows(datasetRows);
                 for(int i = 0;i<fileRows.size();i++) {
                     //TODO optimize building dataset, relly only each unique column sets needs separate table descriptor
                     Map<String, Object> rowValues = Map.class.cast(fileRows.get(i));
-                    TableDescriptor descriptor = getTableDescriptor(prefix, candidate);
-                    Dataset dataset = new Dataset();
-                    dataset.setTable(descriptor.getTable());
-                    dataset.setAutoincrement(descriptor.getAutoincrement());
-                    dataset.setPkColumns(descriptor.getPkColumns());
-                    dataset.setColumns(new ArrayList<String>(rowValues.keySet()));
-                    dataset.setSchema(descriptor.getSchema());
-                    dataset.setSchemaUrl(descriptor.getSchemaUrl());
-                    List<Row> datasetRows = new ArrayList<Row>();
-                    dataset.setRows(datasetRows);
                     Row datasetRow = new Row();
                     datasetRow.setSource(candidate.getName()+"[" + (i+ 1)+"]");
                     datasetRow.setValues(rowValues);
                     datasetRows.add(datasetRow);
-                    result.getDatasets().add(dataset);
+                    allColumns.addAll(rowValues.keySet());
                 }
-
+                dataset.setColumns(new ArrayList<String>(allColumns));
             }
         }
         return result;

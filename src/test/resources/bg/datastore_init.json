@@ -7,6 +7,14 @@
       "ConfigUrl": "test://resources/bg/config/store.json",
       "Descriptors": [
         {
+          "Table": "travelers1_count",
+          "PkColumns": ["id"],
+          "Columns": ["id", "visits"],
+          "FromQuery": "SELECT  /* USE LEGACY SQL */ id, COUNT( mostLikedCity.visits ) WITHIN RECORD AS visits FROM travelers1"
+        },
+
+
+        {
           "Table": "travelers1",
           "PkColumns": [
             "id"
