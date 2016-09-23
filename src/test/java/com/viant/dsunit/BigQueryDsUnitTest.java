@@ -61,14 +61,14 @@ public class BigQueryDsUnitTest {
         DsUnitService service = getDsUnitService();
         try {
             Response response = null;
-            response = service.initFromURL("test://resources/bg/datastore_init.json");
+            response = service.initFromURL("test://resources/bq/datastore_init.json");
             Assert.assertEquals("should have ok status " + response, "ok", response.getStatus());
 
 
 
 
             //populate datastore(BigQuery) with data defined in json files in src/test/resources starting with test1_prepare_<table>
-            response = service.prepareDatastore("MyDataset", new File("src/test/resources/bg").getAbsolutePath(), "test1");
+            response = service.prepareDatastore("MyDataset", new File("src/test/resources/bq").getAbsolutePath(), "test1");
             Assert.assertEquals("should have ok status " + response, "ok", response.getStatus());
 
             //Business logic would come here
@@ -77,7 +77,7 @@ public class BigQueryDsUnitTest {
 
             {
                 //verify that datastore(BigQuery) has snapshot of data defined in json files in src/test/resources starting with test1_expect_<table>
-                ExpectResponse expectResponse = service.expectDatasets("MyDataset", new File("src/test/resources/bg").getAbsolutePath(), "test1", DsUnitService.SNAPSHOT_DATASET_CHECK_POLICY);
+                ExpectResponse expectResponse = service.expectDatasets("MyDataset", new File("src/test/resources/bq").getAbsolutePath(), "test1", DsUnitService.SNAPSHOT_DATASET_CHECK_POLICY);
                 Assert.assertEquals("should have ok status " + expectResponse, "ok", expectResponse.getStatus());
             }
 
@@ -85,7 +85,7 @@ public class BigQueryDsUnitTest {
 
                 //verify that datastore(BigQuery) has snapshot of data defined in json files in src/test/resources starting with test2_expect_<table>
                 //test2 data has different data than datastore should there should be an error
-                ExpectResponse expectResponse = service.expectDatasets("MyDataset", new File("src/test/resources/bg").getAbsolutePath(), "test2", DsUnitService.SNAPSHOT_DATASET_CHECK_POLICY);
+                ExpectResponse expectResponse = service.expectDatasets("MyDataset", new File("src/test/resources/bq").getAbsolutePath(), "test2", DsUnitService.SNAPSHOT_DATASET_CHECK_POLICY);
                 Assert.assertEquals("should have error status " + expectResponse, "error", expectResponse.getStatus());
             }
 
@@ -93,7 +93,7 @@ public class BigQueryDsUnitTest {
             {
 
                 //verify  that test3_expect_traveler1_count.json is equal to "SELECT  /* USE LEGACY SQL */ id, COUNT( mostLikedCity.visits ) WITHIN RECORD AS visits FROM travelers1"
-                ExpectResponse expectResponse = service.expectDatasets("MyDataset", new File("src/test/resources/bg").getAbsolutePath(), "test3", DsUnitService.FULL_TABLE_DATASET_CHECK_POLICY);
+                ExpectResponse expectResponse = service.expectDatasets("MyDataset", new File("src/test/resources/bq").getAbsolutePath(), "test3", DsUnitService.FULL_TABLE_DATASET_CHECK_POLICY);
                 Assert.assertEquals("should have ok status " + expectResponse, "ok", expectResponse.getStatus());
             }
         } finally {

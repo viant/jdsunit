@@ -2,7 +2,7 @@
   "DriverName": "bigquery",
   "Parameters": {
     "serviceAccountId": "565950306583-hu98foqgnunu6a1a043plvl03ip60j5g@developer.gserviceaccount.com",
-    "privateKeyPath": "../../../src/test/resources/bg/test_service.pem",
+    "privateKeyPath": "../../../src/test/resources/bq/test_service.pem",
     "projectId": "spheric-arcadia-98015",
     "datasetId": "MyDataset",
     "dateFormat": "yyyy-MM-dd HH:mm:ss z"

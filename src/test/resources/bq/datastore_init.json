@@ -4,7 +4,7 @@
       "Datastore": "MyDataset",
       "AdminDbName": "MyDataset",
       "ClearDatastore": true,
-      "ConfigUrl": "test://resources/bg/config/store.json",
+      "ConfigUrl": "test://resources/bq/config/store.json",
       "Descriptors": [
         {
           "Table": "travelers1_count",
@@ -78,7 +78,7 @@
           "PkColumns": [
             "id"
           ],
-          "SchemaUrl": "test://resources/bg/traveler_schema.json"
+          "SchemaUrl": "test://resources/bq/traveler_schema.json"
         }]
     }
   ]
