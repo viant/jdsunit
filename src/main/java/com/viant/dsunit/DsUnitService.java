@@ -18,6 +18,8 @@
  */
 package com.viant.dsunit;
 
+import java.util.Map;
+
 /**
  * DsUnit client
  */
@@ -58,11 +60,19 @@ public interface DsUnitService {
     //ExpectDatasets verifies dataset data in datastore for matches files with prefix followed by expect_<tablename> in base dir , see DatasetTestManager#PrepareDatastore
     ExpectResponse expectDatasets(String datastore, String baseDir, String prefix, int checkPolicy);
 
+
+    //ExpectDatasets verifies dataset data in datastore for matches files with prefix followed by expect_<tablename> in base dir , see DatasetTestManager#PrepareDatastore
+    ExpectResponse expectDatasets(String datastore, String tableName, int checkPolicy, Map<String, Object>... rowValues);
+
+
     //ExpectDatasets verifies dataset data in datastore for passed in request, see DatasetTestManager#ExpectDataset
     ExpectResponse expectDatasets(ExpectDatasetRequest request);
 
     //ExpectDatasets loads ExpectDatasetRequest json from url to verify dataset, see DatasetTestManager#ExpectDataset
     ExpectResponse expectDatasetsFromURL(String url);
+
+    //ExpectDatasets verifieds dataset data in datastore for matches with json content
+    ExpectResponse expectDatasetsFromJsonContent(String datastore, String tableName, String content, int checkPolity);
 
 
     void close();
