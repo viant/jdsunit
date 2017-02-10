@@ -104,6 +104,22 @@ public class DsUnitServiceFactory {
     }
 
 
+    private void resetDsUnit(ExecutorService service, DsUnitConfig config) {
+        logger.log(Level.INFO, "Finding and killing existing dsunit process");
+        Executor.Info info = Executor.execute(service, 0, null, null, false, "sh", "-c", "ps -c -ef | grep dsunit | awk {'print $2'}");
+        if (!((info.hasExitValue() && info.getExitValue() == 0) && Strings.isNullOrEmpty(info.getError()))) {
+            throw new IllegalStateException("Failed to find existing dsunit process: " + info);
+        }
+        if (!Strings.isNullOrEmpty(info.getOutput())) {
+            try {
+                int pid = Integer.parseInt(info.getOutput());
+                logger.log(Level.INFO, "killing existing dsunit process pid = " + pid);
+                Executor.killNow(service, pid);
+            } catch (NumberFormatException ex) {
+                logger.log(Level.INFO, "no existing processes are running");
+            }
+        }
+    }
 
     public void checkOutDsUnit(ExecutorService service, DsUnitConfig config) {
         logger.log(Level.INFO, "Checking out dsunit");
@@ -157,7 +173,9 @@ public class DsUnitServiceFactory {
         validateConfig(config);
         Executor.Info info = new Executor.Info();
         if(Boolean.TRUE.equals(config.getAutoInstall())) {
+            resetDsUnit(service, config);
             checkOutDsUnit(service, config);
+            info = Executor.execute(service, 0, null, null, false, "sh", "-c", "ps -c -ef | grep dsunit | awk {'print $2'}");
         }
         if(Boolean.TRUE.equals(config.getRunLocally())) {
             info = runDsUnit(service, config);

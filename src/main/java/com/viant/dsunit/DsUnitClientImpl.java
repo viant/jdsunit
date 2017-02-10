@@ -21,6 +21,7 @@ package com.viant.dsunit;
 import com.google.common.base.Strings;
 import com.viant.dsunit.cli.Executor;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.type.TypeReference;
 
 import java.io.File;
 import java.io.IOException;
@@ -67,7 +68,6 @@ public class DsUnitClientImpl implements DsUnitService {
 
         normalizeRequest(request);
 
-
         AsyncInvoker invoker = getAsyncInvoker(client, Collections.<String, String>emptyMap(), path);
         javax.ws.rs.core.Response restResponse;
 
@@ -105,6 +105,7 @@ public class DsUnitClientImpl implements DsUnitService {
                         if(schema.containsKey("Fields")) {
                             descriptor.setSchema(List.class.cast(schema.get("Fields")));
                         }
+                        descriptor.setFromQuery(descriptor.getFromQuery());
                     } catch (IOException e) {
                         throw new IllegalStateException("Failed read request from url", e);
                     }
@@ -116,7 +117,6 @@ public class DsUnitClientImpl implements DsUnitService {
 
             if (!Strings.isNullOrEmpty(config.getConfigUrl())) {
                 String configBody = UrlUtil.readFromUrl(config.getConfigUrl());
-
                 ObjectMapper mapper = new ObjectMapper();
                 try {
                     DatastoreConfig datastoreConfig = mapper.readValue(configBody, DatastoreConfig.class);
@@ -196,6 +196,35 @@ public class DsUnitClientImpl implements DsUnitService {
     }
 
 
+    @SuppressWarnings("unchecked")
+    protected Datasets buildDatasets(String datastore, String tableName, Map<String, Object>... rows) {
+        Datasets result = new Datasets();
+        result.setDatastore(datastore);
+        result.setDatasets(new ArrayList<Dataset>());
+
+        Dataset dataset = new Dataset();
+        TableDescriptor descriptor = getTableDescriptor(tableName);
+        dataset.setTable(descriptor.getTable());
+        dataset.setFromQuery(descriptor.getFromQuery());
+        dataset.setAutoincrement(descriptor.getAutoincrement());
+        dataset.setPkColumns(descriptor.getPkColumns());
+        dataset.setSchema(descriptor.getSchema());
+        dataset.setSchemaUrl(descriptor.getSchemaUrl());
+        result.getDatasets().add(dataset);
+        List<Row> datasetRows = new ArrayList<Row>();
+        Set<String> allColumns = new HashSet<String>();
+        dataset.setRows(datasetRows);
+        for (int i = 0; i < rows.length; i++) {
+            Row datasetRow = new Row();
+            datasetRow.setSource(tableName + "[" + (i + 1) +"]");
+            datasetRow.setValues(rows[i]);
+            datasetRows.add(datasetRow);
+            allColumns.addAll(rows[i].keySet());
+        }
+        dataset.setColumns(new ArrayList<String>(allColumns));
+
+        return result;
+    }
 
     @SuppressWarnings("unchecked")
     protected Datasets buildDatasets(String datastore, String baseDir, String prefix) {
@@ -237,6 +266,10 @@ public class DsUnitClientImpl implements DsUnitService {
     private TableDescriptor getTableDescriptor(String prefix, File candidate) {
         int extensionIndex = candidate.getName().lastIndexOf('.');
         String table = candidate.getName().substring(prefix.length(), extensionIndex);
+        return getTableDescriptor(table);
+    }
+
+    private TableDescriptor getTableDescriptor(String table) {
         TableDescriptor tableDescriptor  = this.tables.get(table);
         if(tableDescriptor == null) {
             throw new IllegalStateException("Failed to lookup table descriptor for " + table);
@@ -320,6 +353,24 @@ public class DsUnitClientImpl implements DsUnitService {
         return expectDatasets(expectDatasetRequest);
     }
 
+    public ExpectResponse expectDatasetsFromJsonContent(String datastore, String tableName, String content, int checkPolicy) {
+        ObjectMapper mapper = new ObjectMapper();
+        TypeReference typeReference = new TypeReference<List<Map<String, Object>>>() {};
+        try {
+            List<Map<String, Object>> rows = mapper.readValue(content, typeReference);
+            return expectDatasets(datastore, tableName, checkPolicy, rows.toArray(new HashMap[rows.size()]));
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to submit init datastore request", ex);
+        }
+    }
+
+    public ExpectResponse expectDatasets(String datastore, String tableName, int checkPolicy, Map<String, Object>... rows) {
+        Datasets datasets = buildDatasets(datastore, tableName, rows);
+        ExpectDatasetRequest expectDatasetRequest = new ExpectDatasetRequest();
+        expectDatasetRequest.setExpect(Arrays.asList(datasets));
+        expectDatasetRequest.setCheckPolicy(checkPolicy);
+        return expectDatasets(expectDatasetRequest);
+    }
 
 
     public ExpectResponse expectDatasets(ExpectDatasetRequest request) {
