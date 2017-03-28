@@ -18,22 +18,40 @@
  */
 package com.viant.dsunit;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.util.List;
 
 /**
  * DsUnitConfig
  */
+@JsonIgnoreProperties(ignoreUnknown=true)
 public class DsUnitConfig {
 
 
+    @JsonProperty("autoInstall")
     private Boolean autoInstall;
+
+    @JsonProperty("runLocally")
     private Boolean runLocally;
+
+    @JsonProperty("goPath")
     private String goPath;
+
+    @JsonProperty("goBinPath")
     private String goBinPath;
+
+    @JsonProperty("drivers")
     private List<String> drivers;
 
+    @JsonProperty("serverName")
     private String serverName;//remote dsunit server hostname
+
+    @JsonProperty("serverPort")
     private int serverPort;
+
+    @JsonProperty("testDirectory")
     private String testDirectory;//it will be expanded from 'test://' protocol
 
 

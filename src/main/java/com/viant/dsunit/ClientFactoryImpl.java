@@ -21,13 +21,9 @@ package com.viant.dsunit;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
 
-import org.apache.http.conn.HttpClientConnectionManager;
-import org.glassfish.jersey.apache.connector.ApacheClientProperties;
-import org.glassfish.jersey.client.ClientConfig;
-import org.glassfish.jersey.jackson.JacksonFeature;
+import com.ning.http.client.AsyncHttpClient;
+import com.ning.http.client.AsyncHttpClientConfig;
 
 /**
  * The ClientFactoryImpl is to be injected as a singleton to create
@@ -36,21 +32,20 @@ import org.glassfish.jersey.jackson.JacksonFeature;
 @Singleton
 public class ClientFactoryImpl implements ClientFactory {
 
-    private final HttpClientConnectionManager connectionManager;
+    private final int REQUEST_TIMEOUT_IN_MILLISECONDS = 80000;
 
     @Inject
-    public ClientFactoryImpl(HttpClientConnectionManager connectionManager) {
-        this.connectionManager = connectionManager;
+    public ClientFactoryImpl() {
     }
 
-    public Client getClient() {
-        ClientConfig clientConfig = new ClientConfig();
-
-        clientConfig.property(ApacheClientProperties.CONNECTION_MANAGER, this.connectionManager);
-        clientConfig.register(JacksonFeature.class);
-
-
-        return ClientBuilder.newClient(clientConfig);
+    public AsyncHttpClient getClient() {
+        AsyncHttpClientConfig.Builder builder = new AsyncHttpClientConfig.Builder();
+        builder.setCompressionEnabled(true)
+                .setAllowPoolingConnection(true)
+                .setRequestTimeoutInMs(REQUEST_TIMEOUT_IN_MILLISECONDS)
+                .build();
+        AsyncHttpClient client = new AsyncHttpClient(builder.build());
+        return client;
     }
 
 

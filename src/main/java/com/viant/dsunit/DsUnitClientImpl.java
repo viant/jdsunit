@@ -18,26 +18,26 @@
  */
 package com.viant.dsunit;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
+import com.ning.http.client.AsyncCompletionHandler;
+import com.ning.http.client.AsyncHttpClient;
+import com.ning.http.client.ListenableFuture;
 import com.viant.dsunit.cli.Executor;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.type.TypeReference;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.logging.Logger;
 import java.util.concurrent.ExecutorService;
-import javax.ws.rs.client.AsyncInvoker;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.GenericType;
-import javax.ws.rs.core.MediaType;
 
 /**
  * DsUnitClientImpl provides an implementation to dsunit client
  */
 public class DsUnitClientImpl implements DsUnitService {
+
+    private final Logger logger = Logger.getLogger(DsUnitClientImpl.class.getName());
 
     public static final String VERSION = "/v1/";
     public static final String URI_TEMPLATE = VERSION + "%s";
@@ -47,6 +47,8 @@ public class DsUnitClientImpl implements DsUnitService {
     public static final String PREPARE_URI = String.format(URI_TEMPLATE, "prepare");
     public static final String EXPECT_URI = String.format(URI_TEMPLATE, "expect");
 
+    public static final String HTTP_HEADER_CONTENT_TYPE = "Content-Type";
+    public static final String CONTENT_TYPE_JSON = "application/json; charset=UTF-8";
 
     private final DsUnitConfig config;
     private final ClientFactory clientFactory;
@@ -62,31 +64,48 @@ public class DsUnitClientImpl implements DsUnitService {
         this.tables = new HashMap<String, TableDescriptor>();
     }
 
-    public Response init(InitDatastoreRequest request) {
-        Client client = this.clientFactory.getClient();
+    public Response init(final InitDatastoreRequest request) {
+        AsyncHttpClient client = this.clientFactory.getClient();
         String[] path = new String[]{INIT_URI};
 
         normalizeRequest(request);
 
-        AsyncInvoker invoker = getAsyncInvoker(client, Collections.<String, String>emptyMap(), path);
-        javax.ws.rs.core.Response restResponse;
+        AsyncHttpClient.BoundRequestBuilder asyncRequestBuilder = getAsyncRequestBuilder(client, Collections.<String, String>emptyMap(), path);
+        ObjectMapper mapper = new ObjectMapper();
+        Response response;
 
         try {
-            restResponse = invoker.post(Entity.entity(request, MediaType.APPLICATION_JSON)).get();
+            byte[] entity = mapper.writeValueAsBytes(request);
+            asyncRequestBuilder.setBody(entity);
+            ListenableFuture<com.ning.http.client.Response> future = asyncRequestBuilder.execute(new AsyncCompletionHandler<com.ning.http.client.Response>() {
+                @Override
+                public com.ning.http.client.Response onCompleted(com.ning.http.client.Response response) throws Exception {
+                    return response;
+                }
 
-
-            if (restResponse.getStatus() == 401) {
-                invoker = getAsyncInvoker(client, Collections.<String, String>emptyMap(), path);
-                restResponse = invoker.post(Entity.entity(request, MediaType.APPLICATION_JSON)).get();
-
+                @Override
+                public void onThrowable(Throwable t) {
+                    logger.warning("Failed to return init response from request " + request);
+                }
+            });
+            com.ning.http.client.Response restResponse = future.get();
+            if (restResponse == null) {
+                throw new IllegalArgumentException("Rest response for " + request + " is null");
             }
+
+            if (restResponse.getStatusCode() == 401) {
+                logger.info("Retrying init datastore request " + request);
+                asyncRequestBuilder = getAsyncRequestBuilder(client, Collections.<String, String>emptyMap(), path);
+                restResponse = asyncRequestBuilder.setBody(entity).execute().get();
+            }
+            handleInternalError(restResponse);
+            response = mapper.readValue(restResponse.getResponseBody(), Response.class);
 
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to submit init datastore request", ex);
+        } finally {
+            client.close();
         }
-        handleInternalError(restResponse);
-        Response response = restResponse.readEntity(new GenericType<Response>() {
-        });
         return response;
     }
 
@@ -157,29 +176,49 @@ public class DsUnitClientImpl implements DsUnitService {
         }
     }
 
-    public Response executeScripts(ExecuteScriptRequest request) {
+    public Response executeScripts(final ExecuteScriptRequest request) {
         for (Script script : request.getScripts()) {
             script.setUrl(expandTestProtocolAsUrl(script.getUrl()));
         }
-        Client client = this.clientFactory.getClient();
+        AsyncHttpClient client = this.clientFactory.getClient();
         String[] path = new String[]{EXECUTE_URI};
-        AsyncInvoker invoker = getAsyncInvoker(client, Collections.<String, String>emptyMap(), path);
-        javax.ws.rs.core.Response restResponse;
-        try {
-            restResponse = invoker.post(Entity.entity(request, MediaType.APPLICATION_JSON)).get();
-            if (restResponse.getStatus() == 401) {
-                invoker = getAsyncInvoker(client, Collections.<String, String>emptyMap(), path);
-                restResponse = invoker.post(Entity.entity(request, MediaType.APPLICATION_JSON)).get();
+        AsyncHttpClient.BoundRequestBuilder requestBuilder = getAsyncRequestBuilder(client, Collections.<String, String>emptyMap(), path);
 
+        ObjectMapper mapper = new ObjectMapper();
+        Response response;
+
+        try {
+            byte[] entity = mapper.writeValueAsBytes(request);
+            ListenableFuture<com.ning.http.client.Response> future = requestBuilder.setBody(entity).execute(new AsyncCompletionHandler<com.ning.http.client.Response>() {
+                @Override
+                public com.ning.http.client.Response onCompleted(com.ning.http.client.Response response) throws Exception {
+                    return response;
+                }
+
+                @Override
+                public void onThrowable(Throwable t) {
+                    logger.warning("Failed to return execute scripts response from request " + request);
+                }
+            });
+            com.ning.http.client.Response restResponse = future.get();
+            if (restResponse == null) {
+                throw new IllegalArgumentException("Rest response for " + request + " is null");
             }
 
+            if (restResponse.getStatusCode() == 401) {
+                logger.info("Retrying execute scripts request " + request);
+                requestBuilder = getAsyncRequestBuilder(client, Collections.<String, String>emptyMap(), path);
+                future = requestBuilder.setBody(entity).execute();
+                restResponse = future.get();
+            }
+            handleInternalError(restResponse);
+            response = mapper.readValue(restResponse.getResponseBody(), Response.class);
+
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to submit init datastore request", ex);
+            throw new IllegalStateException("Failed to submit execute scripts request", ex);
+        } finally {
+            client.close();
         }
-        handleInternalError(restResponse);
-
-
-        Response response = restResponse.readEntity(new GenericType<Response>() {});
         return response;
     }
 
@@ -197,7 +236,7 @@ public class DsUnitClientImpl implements DsUnitService {
 
 
     @SuppressWarnings("unchecked")
-    protected Datasets buildDatasets(String datastore, String tableName, Map<String, Object>... rows) {
+    protected Datasets buildDatasets(String datastore, String tableName, Row... rows) {
         Datasets result = new Datasets();
         result.setDatastore(datastore);
         result.setDatasets(new ArrayList<Dataset>());
@@ -208,18 +247,15 @@ public class DsUnitClientImpl implements DsUnitService {
         dataset.setFromQuery(descriptor.getFromQuery());
         dataset.setAutoincrement(descriptor.getAutoincrement());
         dataset.setPkColumns(descriptor.getPkColumns());
+        dataset.setOrderColumns(descriptor.getOrderColumns());
         dataset.setSchema(descriptor.getSchema());
         dataset.setSchemaUrl(descriptor.getSchemaUrl());
         result.getDatasets().add(dataset);
-        List<Row> datasetRows = new ArrayList<Row>();
+        List<Row> datasetRows = Arrays.asList(rows);
         Set<String> allColumns = new HashSet<String>();
         dataset.setRows(datasetRows);
         for (int i = 0; i < rows.length; i++) {
-            Row datasetRow = new Row();
-            datasetRow.setSource(tableName + "[" + (i + 1) +"]");
-            datasetRow.setValues(rows[i]);
-            datasetRows.add(datasetRow);
-            allColumns.addAll(rows[i].keySet());
+            allColumns.addAll(rows[i].getValues().keySet());
         }
         dataset.setColumns(new ArrayList<String>(allColumns));
 
@@ -242,6 +278,7 @@ public class DsUnitClientImpl implements DsUnitService {
                 dataset.setFromQuery(descriptor.getFromQuery());
                 dataset.setAutoincrement(descriptor.getAutoincrement());
                 dataset.setPkColumns(descriptor.getPkColumns());
+                dataset.setOrderColumns(descriptor.getOrderColumns());
                 dataset.setSchema(descriptor.getSchema());
                 dataset.setSchemaUrl(descriptor.getSchemaUrl());
                 result.getDatasets().add(dataset);
@@ -311,25 +348,46 @@ public class DsUnitClientImpl implements DsUnitService {
     }
 
 
-    public Response prepareDatastore(PrepareDatastoreRequest request) {
-        Client client = this.clientFactory.getClient();
+    public Response prepareDatastore(final PrepareDatastoreRequest request) {
+        AsyncHttpClient client = this.clientFactory.getClient();
         String[] path = new String[]{PREPARE_URI};
 
-        AsyncInvoker invoker = getAsyncInvoker(client, Collections.<String, String>emptyMap(), path);
-        javax.ws.rs.core.Response restResponse;
+        AsyncHttpClient.BoundRequestBuilder requestBuilder = getAsyncRequestBuilder(client, Collections.<String, String>emptyMap(), path);
+        ObjectMapper mapper = new ObjectMapper();
+        Response response;
 
         try {
-            restResponse = invoker.post(Entity.entity(request, MediaType.APPLICATION_JSON)).get();
-            if (restResponse.getStatus() == 401) {
-                invoker = getAsyncInvoker(client, Collections.<String, String>emptyMap(), path);
-                restResponse = invoker.post(Entity.entity(request, MediaType.APPLICATION_JSON)).get();
+            byte[] entity = mapper.writeValueAsBytes(request);
+            ListenableFuture<com.ning.http.client.Response> future = requestBuilder.setBody(entity).execute(new AsyncCompletionHandler<com.ning.http.client.Response>() {
+                @Override
+                public com.ning.http.client.Response onCompleted(com.ning.http.client.Response response) throws Exception {
+                    return response;
+                }
+                @Override
+                public void onThrowable(Throwable t) {
+                    logger.warning("Failed to return prepare response from request " + request);
+                }
+            });
+
+            com.ning.http.client.Response restResponse = future.get();
+            if (restResponse == null) {
+                throw new IllegalArgumentException("Rest response for " + request + " is null");
+            }
+
+            if (restResponse.getStatusCode() == 401) {
+                logger.warning("Retrying prepare datastore request " + request);
+                requestBuilder = getAsyncRequestBuilder(client, Collections.<String, String>emptyMap(), path);
+                future = requestBuilder.setBody(entity).execute();
+                restResponse = future.get();
 
             }
+            handleInternalError(restResponse);
+            response = mapper.readValue(restResponse.getResponseBody(), Response.class);
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to submit init datastore request", ex);
+            throw new IllegalStateException("Failed to submit prepare datastore request", ex);
+        } finally {
+            client.close();
         }
-        handleInternalError(restResponse);
-        Response response = restResponse.readEntity(new GenericType<Response>() {});
 
         return response;
     }
@@ -355,16 +413,16 @@ public class DsUnitClientImpl implements DsUnitService {
 
     public ExpectResponse expectDatasetsFromJsonContent(String datastore, String tableName, String content, int checkPolicy) {
         ObjectMapper mapper = new ObjectMapper();
-        TypeReference typeReference = new TypeReference<List<Map<String, Object>>>() {};
+        TypeReference typeReference = new TypeReference<Row[]>() {};
         try {
-            List<Map<String, Object>> rows = mapper.readValue(content, typeReference);
-            return expectDatasets(datastore, tableName, checkPolicy, rows.toArray(new HashMap[rows.size()]));
+            Row[] rows = mapper.readValue(content, typeReference);
+            return expectDatasets(datastore, tableName, checkPolicy, rows);
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to submit init datastore request", ex);
+            throw new IllegalStateException("Failed to submit expect datasets request", ex);
         }
     }
 
-    public ExpectResponse expectDatasets(String datastore, String tableName, int checkPolicy, Map<String, Object>... rows) {
+    public ExpectResponse expectDatasets(String datastore, String tableName, int checkPolicy, Row... rows) {
         Datasets datasets = buildDatasets(datastore, tableName, rows);
         ExpectDatasetRequest expectDatasetRequest = new ExpectDatasetRequest();
         expectDatasetRequest.setExpect(Arrays.asList(datasets));
@@ -373,24 +431,45 @@ public class DsUnitClientImpl implements DsUnitService {
     }
 
 
-    public ExpectResponse expectDatasets(ExpectDatasetRequest request) {
-        Client client = this.clientFactory.getClient();
+    public ExpectResponse expectDatasets(final ExpectDatasetRequest request) {
+        AsyncHttpClient client = this.clientFactory.getClient();
         String[] path = new String[]{EXPECT_URI};
-        AsyncInvoker invoker = getAsyncInvoker(client, Collections.<String, String>emptyMap(), path);
-        javax.ws.rs.core.Response restResponse;
+        AsyncHttpClient.BoundRequestBuilder requestBuilder = getAsyncRequestBuilder(client, Collections.<String, String>emptyMap(), path);
+
+        ObjectMapper mapper = new ObjectMapper();
+        ExpectResponse response;
+
         try {
-            restResponse = invoker.post(Entity.entity(request, MediaType.APPLICATION_JSON)).get();
-            if (restResponse.getStatus() == 401) {
-                invoker = getAsyncInvoker(client, Collections.<String, String>emptyMap(), path);
-                restResponse = invoker.post(Entity.entity(request, MediaType.APPLICATION_JSON)).get();
+            byte[] entity = mapper.writeValueAsBytes(request);
+            ListenableFuture<com.ning.http.client.Response> future = requestBuilder.setBody(entity).execute(new AsyncCompletionHandler<com.ning.http.client.Response>() {
+                @Override
+                public com.ning.http.client.Response onCompleted(com.ning.http.client.Response response) throws Exception {
+                    return response;
+                }
+                @Override
+                public void onThrowable(Throwable t) {
+                    logger.warning("Failed to return expect response from request " + request);
+                }
+            });
+            com.ning.http.client.Response restResponse = future.get();
+            if (restResponse == null) {
+                throw new IllegalArgumentException("Rest response for " + request + " is null");
+            }
+
+            if (restResponse.getStatusCode() == 401) {
+                logger.info("Retrying expect datasets request " + request);
+                requestBuilder = getAsyncRequestBuilder(client, Collections.<String, String>emptyMap(), path);
+                future = requestBuilder.setBody(entity).execute();
+                restResponse = future.get();
 
             }
+            handleInternalError(restResponse);
+            response = mapper.readValue(restResponse.getResponseBody(), ExpectResponse.class);
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to submit init datastore request", ex);
+            throw new IllegalStateException("Failed to submit expect request", ex);
+        } finally {
+            client.close();
         }
-        handleInternalError (restResponse);
-        ExpectResponse response = restResponse.readEntity(new GenericType<ExpectResponse>() {
-        });
         return response;
     }
 
@@ -418,29 +497,27 @@ public class DsUnitClientImpl implements DsUnitService {
 
     }
 
-
-    private AsyncInvoker getAsyncInvoker(Client client, Map<String, String> queryString, String... paths) {
-
+    private AsyncHttpClient.BoundRequestBuilder getAsyncRequestBuilder(AsyncHttpClient client, Map<String, String> queryString, String... paths) {
         String target = config.getServerName();
         if (config.getServerPort() != 80) {
             target = target + ":" + config.getServerPort();
         }
-        WebTarget webTarget = client.target(target);
-
         for (String path : paths) {
-            webTarget = webTarget.path(path);
+            target += path;
         }
+        AsyncHttpClient.BoundRequestBuilder requestBuilder = client.preparePost(target);
+
         for (String key : queryString.keySet()) {
-            webTarget = webTarget.queryParam(key, queryString.get(key));
+            requestBuilder.addQueryParameter(key, queryString.get(key));
         }
-        return webTarget.request(MediaType.APPLICATION_JSON)
-                .async();
+        requestBuilder.addHeader(HTTP_HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON);
+        return requestBuilder;
     }
 
 
-    private void handleInternalError(javax.ws.rs.core.Response restResponse) {
-        if(restResponse.getStatus() == 500) {
-            throw new IllegalStateException("Failed to send request:    " + restResponse.getStatusInfo() + " " + restResponse.getHeaderString("Error"));
+    private void handleInternalError(com.ning.http.client.Response restResponse) {
+        if(restResponse.getStatusCode() == 500) {
+            throw new IllegalStateException("Failed to send request:    " + restResponse.getStatusText() + " " + restResponse.getHeader("Error"));
         }
 
     }
@@ -459,4 +536,39 @@ public class DsUnitClientImpl implements DsUnitService {
         }
         return text.replace("test://", "file://" + config.getTestDirectory()+"/");
     }
+
+    private Set<String> getAllKeys(Map<String, Object> row) {
+        Set<String> allColumns = new HashSet<String>();
+        if(row != null) {
+            readMap(row, allColumns);
+        }
+        return allColumns;
+    }
+
+    private void readMap(Map<String, Object> map, Set<String> allColumns) {
+        for (Map.Entry<String, Object> entry: map.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+
+            if (value instanceof Map) {
+                readMap((Map) value, allColumns);
+            } else if (value instanceof List) {
+                readList((List)value, allColumns);
+            } else { // is a value
+                allColumns.add(key);
+            }
+        }
+    }
+
+    private void readList(List<String> list, Set<String> allColumns) {
+        for (int i = 0; i < list.size(); i++) {
+            Object value = list.get(i);
+            if (value instanceof Map) {
+                readMap((Map) value, allColumns);
+            } else if (value instanceof List) {
+                readList((List)value, allColumns);
+            }
+        }
+    }
+
 }
