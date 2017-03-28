@@ -20,7 +20,6 @@ package com.viant.dsunit;
 
 import com.google.common.base.Strings;
 import com.viant.dsunit.cli.Executor;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -28,6 +27,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -60,18 +60,22 @@ public class DsUnitServiceFactory {
 
 
             logger.log(Level.INFO, "Updating dsunit dependenices ...");
-            Executor.Info info = runCommand(service, dsUnitServerLaunchFile.getParentFile(), config, false,   "sh", "-c", "cd " + dsUnitServerLaunchFile.getParent() + " && " + config.getGoBinPath() + " get");
-            if (!((info.hasExitValue() &&  info.getExitValue() == 0) && Strings.isNullOrEmpty(info.getError()))) {
-                throw new IllegalStateException("Failed to update dependencies for:" +dsUnitServerLaunchFile.getAbsolutePath() + " on " + info);
+            Executor.Info info = runCommand(service, dsUnitServerLaunchFile.getParentFile(), config, false, "sh", "-c", "cd " + dsUnitServerLaunchFile.getParent() + " && " + config.getGoBinPath() + " get");
+            TimeUnit.SECONDS.sleep(8);
+            if ((info.hasExitValue() && !(info.getExitValue() == 0) && Strings.isNullOrEmpty(info.getError()))) {
+                throw new IllegalStateException("Failed to update dependencies for:" + dsUnitServerLaunchFile.getAbsolutePath() + " on " + info);
             }
 
-            info = runCommand(service, dsUnitServerLaunchFile.getParentFile(), config, true,  config.getGoBinPath(), "run", dsUnitServerLaunchFile.getName());
-            if ((info.hasExitValue()  && !(info.getExitValue() == 0) && Strings.isNullOrEmpty(info.getError()))) {
-                throw new IllegalStateException("Failed to run dsunit  server:"  + dsUnitServerLaunchFile.getAbsolutePath() + " " + info);
+            info = runCommand(service, dsUnitServerLaunchFile.getParentFile(), config, true, config.getGoBinPath(), "run", dsUnitServerLaunchFile.getName());
+            TimeUnit.SECONDS.sleep(8);
+            if ((info.hasExitValue() && !(info.getExitValue() == 0) && Strings.isNullOrEmpty(info.getError()))) {
+                throw new IllegalStateException("Failed to run dsunit  server:" + dsUnitServerLaunchFile.getAbsolutePath() + " " + info);
             }
             logger.log(Level.INFO, "Started dsunit server pid " + info.getPid());
             return info;
 
+        } catch (InterruptedException e) {
+            throw new IllegalStateException("Failed to create/write file: " + dsUnitServerLaunchFile.getAbsolutePath(), e);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to create/write file: " + dsUnitServerLaunchFile.getAbsolutePath(), e);
         } finally {
@@ -104,12 +108,9 @@ public class DsUnitServiceFactory {
     }
 
 
-    private void resetDsUnit(ExecutorService service, DsUnitConfig config) {
+    public void resetDsUnit(ExecutorService service) {
         logger.log(Level.INFO, "Finding and killing existing dsunit process");
         Executor.Info info = Executor.execute(service, 0, null, null, false, "sh", "-c", "ps -c -ef | grep dsunit | awk {'print $2'}");
-        if (!((info.hasExitValue() && info.getExitValue() == 0) && Strings.isNullOrEmpty(info.getError()))) {
-            throw new IllegalStateException("Failed to find existing dsunit process: " + info);
-        }
         if (!Strings.isNullOrEmpty(info.getOutput())) {
             try {
                 int pid = Integer.parseInt(info.getOutput());
@@ -148,9 +149,14 @@ public class DsUnitServiceFactory {
         if (!new File(config.getGoBinPath()).exists()) {
             throw new IllegalStateException("goBinPath path not found");
         }
+
+        if (config.getGoPath().contains("${GOPATH}")) {
+            config.setGoPath(System.getenv("GOPATH"));
+        }
         if (Strings.isNullOrEmpty(config.getGoPath())) {
             throw new IllegalStateException("GoPath was empty");
         }
+
         if (!new File(config.getGoPath()).exists()) {
             new File(config.getGoPath()).mkdirs();
         }
@@ -162,7 +168,7 @@ public class DsUnitServiceFactory {
         if (config.getServerPort() == 0) {
             throw new IllegalStateException("ServerPort was not set");
         }
-        if(Strings.isNullOrEmpty(config.getServerName() )) {
+        if(Strings.isNullOrEmpty(config.getServerName())) {
             throw new IllegalStateException("ServerName was not set");
         }
 
@@ -173,16 +179,16 @@ public class DsUnitServiceFactory {
         validateConfig(config);
         Executor.Info info = new Executor.Info();
         if(Boolean.TRUE.equals(config.getAutoInstall())) {
-            resetDsUnit(service, config);
             checkOutDsUnit(service, config);
             info = Executor.execute(service, 0, null, null, false, "sh", "-c", "ps -c -ef | grep dsunit | awk {'print $2'}");
         }
         if(Boolean.TRUE.equals(config.getRunLocally())) {
+            resetDsUnit(service);
             info = runDsUnit(service, config);
         }
 
 
-        return new DsUnitClientImpl(config, new ClientFactoryImpl(new PoolingHttpClientConnectionManager()), service, info);
+        return new DsUnitClientImpl(config, new ClientFactoryImpl(), service, info);
     }
 
 }

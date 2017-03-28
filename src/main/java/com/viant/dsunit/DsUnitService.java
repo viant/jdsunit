@@ -62,7 +62,7 @@ public interface DsUnitService {
 
 
     //ExpectDatasets verifies dataset data in datastore for matches files with prefix followed by expect_<tablename> in base dir , see DatasetTestManager#PrepareDatastore
-    ExpectResponse expectDatasets(String datastore, String tableName, int checkPolicy, Map<String, Object>... rowValues);
+    ExpectResponse expectDatasets(String datastore, String tableName, int checkPolicy, Row... rowValues);
 
 
     //ExpectDatasets verifies dataset data in datastore for passed in request, see DatasetTestManager#ExpectDataset

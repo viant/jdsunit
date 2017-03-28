@@ -18,8 +18,8 @@
  */
 package com.viant.dsunit;
 
-import org.codehaus.jackson.annotate .JsonIgnoreProperties;
-import org.codehaus.jackson.annotate .JsonProperty;
+import com.fasterxml.jackson.annotation .JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation .JsonProperty;
 
 import java.util.List;
 
@@ -42,6 +42,9 @@ public class TableDescriptor {
 
     @JsonProperty("Columns")
     private List<String> columns;
+
+    @JsonProperty("OrderColumns")
+    private List<String> orderColumns;
 
     @JsonProperty("Schema")
     private List<Object> schema; //Schema to be interpreted by NoSQL drivers for create table operation .
@@ -82,6 +85,14 @@ public class TableDescriptor {
 
     public void setColumns(List<String> columns) {
         this.columns = columns;
+    }
+
+    public List<String> getOrderColumns() {
+        return orderColumns;
+    }
+
+    public void setOrderColumns(List<String> orderColumns) {
+        this.orderColumns = orderColumns;
     }
 
     public List<Object> getSchema() {

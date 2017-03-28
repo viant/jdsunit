@@ -246,7 +246,12 @@ public class Executor {
 
     public static void killNow(ExecutorService service, int pid) {
         Info info = execute(service, 0, null, null, false, "kill", "-9", "" + pid);
-        if (info.exitValue != 0 || !Strings.isNullOrEmpty(info.error)) {
+        try {
+            TimeUnit.SECONDS.sleep(8);
+        } catch (InterruptedException e) {
+            throw new IllegalStateException("Failed to kill process " + pid, e);
+        }
+        if ((info.hasExitValue() && !(info.getExitValue() == 0) && Strings.isNullOrEmpty(info.getError()))) {
             throw new IllegalStateException("Failed to kill process " + pid + " " + info);
         }
 

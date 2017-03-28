@@ -18,7 +18,7 @@
  */
 package com.viant.dsunit;
 
-import javax.ws.rs.client.Client;
+import com.ning.http.client.AsyncHttpClient;
 
 /**
  * ClientFactory interface to create REST clients
@@ -26,5 +26,5 @@ import javax.ws.rs.client.Client;
  */
 public interface ClientFactory {
 
-    Client getClient();
+    AsyncHttpClient getClient();
 }
