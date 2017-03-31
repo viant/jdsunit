@@ -125,7 +125,7 @@ public class DsUnitServiceFactory {
     public void checkOutDsUnit(ExecutorService service, DsUnitConfig config) {
         logger.log(Level.INFO, "Checking out dsunit");
         Executor.Info info = runCommand(service, new File(config.getGoPath()), config, false,  config.getGoBinPath(), "get", DSUNITURL);
-        if (!((info.hasExitValue() && info.getExitValue() == 0) && Strings.isNullOrEmpty(info.getError()))) {
+        if ((info.hasExitValue() && !(info.getExitValue() == 0) && Strings.isNullOrEmpty(info.getError()))) {
             throw new IllegalStateException("Failed to checkout dsunit:" + info);
       }
 
